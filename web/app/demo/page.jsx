@@ -1,0 +1,1 @@
+import Demo from '../../components/Demo';export default function Page(){return <><div className="header"><div><div className="eyebrow">LABORATORIO / ESCENARIOS</div><h1>Panel de demostración</h1><p>Dispará escenarios reproducibles para validar los casos de uso.</p></div></div><Demo/></>}

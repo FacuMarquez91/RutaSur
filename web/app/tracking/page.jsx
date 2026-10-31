@@ -1,0 +1,1 @@
+import TrackingSearch from '../../components/TrackingSearch';export default function Tracking(){return <><div className="header"><div><div className="eyebrow">SEGUIMIENTO PARA DESTINATARIOS</div><h1>Seguí tu envío</h1><p>Ingresá el código para conocer el estado y la fecha estimada de entrega.</p></div></div><div className="card"><TrackingSearch/></div></>}

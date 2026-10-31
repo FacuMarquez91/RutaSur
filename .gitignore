@@ -1,0 +1,24 @@
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Next.js
+.next/
+**/.next/
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Respaldos y archivos temporales
+*.archive
+*.dump
+*.bak
+*.log
+
+# Configuraciones locales
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

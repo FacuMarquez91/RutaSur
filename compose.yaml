@@ -1,0 +1,101 @@
+name: rutasur
+services:
+  kafka:
+    image: apache/kafka:3.9.1
+    hostname: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+    ports: ['29092:29092']
+    volumes: ['kafka_data:/var/lib/kafka/data']
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 8s
+      timeout: 6s
+      retries: 25
+  mongo:
+    image: mongo:7
+    command: ["mongod","--replSet","rs0","--bind_ip_all"]
+    ports: ['27017:27017']
+    volumes: ['mongo_data:/data/db']
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok' | grep 1"]
+      interval: 5s
+      retries: 20
+  mongo-setup:
+    image: mongo:7
+    depends_on: {mongo: {condition: service_healthy}}
+    command: ["bash","-c","mongosh --host mongo:27017 --quiet --eval 'try { rs.status() } catch(e) { rs.initiate({_id: \"rs0\", members: [{_id: 0, host: \"mongo:27017\"}]}) }'; until mongosh --host mongo:27017 --quiet --eval 'db.hello().isWritablePrimary' | grep true; do sleep 2; done"]
+    restart: 'no'
+  topics:
+    image: apache/kafka:3.9.1
+    depends_on: {kafka: {condition: service_healthy}}
+    entrypoint: ["/bin/bash","-c"]
+    command:
+      - |
+        set -e
+        for topic in envios.estados envios.reprogramaciones envios.estados.dlq; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic "$$topic" --partitions 3 --replication-factor 1 --config retention.ms=2592000000
+        done
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic envios.promesas --partitions 3 --replication-factor 1 --config cleanup.policy=compact
+        for topic in alertas.sla notificaciones.enviadas; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic "$$topic" --partitions 3 --replication-factor 1 --config retention.ms=604800000
+        done
+    restart: 'no'
+  proyector: &worker
+    build: .
+    environment: &baseenv
+      KAFKA_BROKERS: kafka:9092
+      MONGO_URL: mongodb://mongo:27017/?replicaSet=rs0&directConnection=true
+      DB_NAME: rutasur
+    command: ["node","services/worker.js","proyector"]
+    depends_on:
+      topics: {condition: service_completed_successfully}
+      mongo-setup: {condition: service_completed_successfully}
+    restart: unless-stopped
+  notificaciones:
+    <<: *worker
+    command: ["node","services/worker.js","notificaciones"]
+  reprogramacion:
+    <<: *worker
+    command: ["node","services/worker.js","reprogramacion"]
+  monitor-sla:
+    <<: *worker
+    command: ["node","services/worker.js","monitor-sla"]
+  analitica:
+    <<: *worker
+    command: ["node","services/worker.js","analitica"]
+  simulador:
+    <<: *worker
+    command: ["node","simulator/index.js"]
+    environment:
+      <<: *baseenv
+      SIM_RATE: ${SIM_RATE:-20}
+      SIM_SPEED: ${SIM_SPEED:-120}
+      SIM_SEED: ${SIM_SEED:-2026}
+    ports: ['4000:4000']
+  web:
+    build: ./web
+    environment:
+      MONGO_URL: mongodb://mongo:27017/?replicaSet=rs0&directConnection=true
+      DB_NAME: rutasur
+      SIMULATOR_URL: http://simulador:4000
+    ports: ['3000:3000']
+    depends_on:
+      mongo-setup: {condition: service_completed_successfully}
+      simulador: {condition: service_started}
+    restart: unless-stopped
+volumes:
+  kafka_data:
+  mongo_data:

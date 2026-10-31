@@ -1,0 +1,1 @@
+{"name":"rutasur-services","private":true,"type":"module","scripts":{"start":"node services/worker.js","simulator":"node simulator/index.js","topics":"node scripts/topics.js","replay":"node scripts/replay.js"},"dependencies":{"kafkajs":"^2.2.4","mongodb":"^6.17.0","express":"^4.21.2"}}

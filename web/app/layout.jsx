@@ -1,0 +1,3 @@
+import './styles.css';import Link from 'next/link';
+export const metadata={title:'RutaSur | Torre de control',description:'Logística orientada a eventos'};
+export default function RootLayout({children}){return <html lang="es"><body><aside className="sidebar"><Link href="/" className="brand"><span className="brandIcon">↗</span> RUTASUR</Link><div className="overline">PLATAFORMA LOGÍSTICA</div><nav><Link href="/">◫ &nbsp; Torre de control</Link><Link href="/analitica">▥ &nbsp; Analítica</Link><Link href="/tracking">◎ &nbsp; Tracking público</Link><Link href="/demo">▸ &nbsp; Panel de demo</Link></nav><div className="sideBottom"><span className="liveDot"/> Sistema local · eventos en vivo</div></aside><main className="main">{children}</main></body></html>}
